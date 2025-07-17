@@ -1,4 +1,14 @@
+# Python artefacts
+__pycache__/
+*.py[cod]
+
+# Virtual environment
 venv/
-flask-key
-exercise1.py
-miniproject.py
+
+# Build outputs
+build/
+dist/
+*.egg-info/
+
+# OS cruft
+.DS_Store
