@@ -1,64 +1,86 @@
 from flask import Flask, request, jsonify
 from faker import Faker
 import random
-from random import randint
-import string
+import iso3166
 
 app = Flask(__name__)
 
 SCHEMAS = {}
 faker = Faker("en_GB")
-ALLOWED_TYPES = {"integer", "string", "dob", "ip"}
+ALLOWED_TYPES = {
+    "integer",
+    "name",
+    "dob",
+    "country",
+    "ip",
+}
 
 
-def generate_integer(option):
-    if option is None:
-        return randint(1, 50000)
-
-    if isinstance(option, int):
-        return randint(1, option)
-
-    option = str(option)
-
-    if "-" in option:
-        low, high = option.split("-", 1)
-        return randint(int(low), int(high))
-
-    return randint(1, int(option))
+def generate_integer(value):
+    min = int(value.get("min", 1))
+    max = int(value.get("max", 50000))
+    return random.randint(min, max)
 
 
-def generate_string(option):
-    if option == "firstname":
-        return faker.first_name()
-    if option == "lastname":
-        return faker.last_name()
-    if option == "fullname":
-        return f"{faker.first_name()} {faker.last_name()}"
-    return "".join(random.choice(string.ascii_letters) for i in range(20))
+def generate_name(value):
+    format = value.get("format", "full")
+    match format:
+        case "first":
+            return faker.first_name()
+        case "last":
+            return faker.last_name()
+        case "full":
+            return f"{faker.first_name()} {faker.last_name()}"
+        case _:
+            raise ValueError("invalid name format entered")
 
 
-def generate_dob(option):
-    if option is None:
-        dob = faker.date_of_birth(minimum_age=12, maximum_age=100)
-        return dob.isoformat()
-
-    if isinstance(option, int):
-        dob = faker.date_of_birth(minimum_age=1, maximum_age=option)
-        return dob.isoformat()
-
-    option = str(option)
-
-    if "-" in option:
-        low, high = option.split("-", 1)
-        dob = faker.date_of_birth(minimum_age=int(low), maximum_age=int(high))
-        return dob.isoformat()
-
-    dob = faker.date_of_birth(minimum_age=12, maximum_age=100)
+def generate_dob(value):
+    min_age = int(value.get("min", 1))
+    max_age = int(value.get("max", 100))
+    dob = faker.date_of_birth(minimum_age=min_age, maximum_age=max_age)
     return dob.isoformat()
 
 
-def generate_ip():
-    return faker.ipv4()
+def generate_ip(value):
+    version = value.get("version", 4)
+    visibility = str(value.get("visibility", None)).lower()
+
+    match (version, visibility):
+        case (4, "public"):
+            return faker.ipv4(private=False)
+        case (4, "private"):
+            return faker.ipv4(private=True)
+        case (6, _):
+            return faker.ipv6()
+        case (4, _):
+            return faker.ipv4()
+        case _:
+            raise ValueError("ip version must be 4 or 6")
+
+
+def generate_country(value):
+    ### alpha2 = US, alpha3 = USA, name = United States
+    format = value.get("format", "alpha2")
+    countries = value.get("countries", None)
+
+    if countries is not None:
+        option = random.choice(countries)
+        option = option.upper()
+    else:
+        option = faker.country_code()
+
+    country = iso3166.countries.get(option)
+
+    match format:
+        case "alpha2":
+            return option
+        case "alpha3":
+            return country.alpha3
+        case "name":
+            return country.name
+        case _:
+            raise ValueError("unsupported country format")
 
 
 def make_document(key_pairs):
@@ -66,10 +88,11 @@ def make_document(key_pairs):
     {
       "schema_name": "Haroldas's Generator",
       "fields": {
-        "name": {"type":"string", "option":"fullname"},
-        "id": {"type":"integer","option":10000},
-        "dob": {"type":"dob","option":"12-30"},
-        "ip":   "ip"
+        "name": {"type": "name", "format": "full"},
+        "id": {"type": "integer","min": 1,"max": 9999},
+        "dob": {"type": "dob","min": 12,"max": 100},
+        "ip": {"type": "ip","version": 4,"visibility": "public"},
+        "country_code": {"type":"country", "format":"alpha2", "countries":["US","GB","FR"]}
       }
     }
     """
@@ -77,17 +100,18 @@ def make_document(key_pairs):
     document = {}
     for field_name, value in key_pairs.items():
         data_type = value["type"]
-        option = value["option"]
 
         match data_type:
             case "integer":
-                document[field_name] = generate_integer(option)
-            case "string":
-                document[field_name] = generate_string(option)
+                document[field_name] = generate_integer(value)
+            case "name":
+                document[field_name] = generate_name(value)
             case "dob":
-                document[field_name] = generate_dob(option)
+                document[field_name] = generate_dob(value)
             case "ip":
-                document[field_name] = generate_ip()
+                document[field_name] = generate_ip(value)
+            case "country":
+                document[field_name] = generate_country(value)
             case _:
                 raise ValueError(f"Unsupported type: {data_type}")
 
@@ -100,10 +124,11 @@ def create_schema():
     {
       "schema_name": "Haroldas's Generator",
       "fields": {
-        "name": {"type":"string", "option":"fullname"},
-        "id": {"type":"integer","option":10000},
-        "dob": {"type":"dob","option":"12-30"},
-        "ip":   "ip"
+        "name": {"type": "name", "format": "full"},
+        "id": {"type": "integer","min": 1,"max": 9999},
+        "dob": {"type": "dob","min": 12,"max": 100},
+        "ip": {"type": "ip","version": 4,"visibility": "public"},
+        "country_code": {"type":"country", "format":"alpha2", "countries":["US","GB","FR"]}
       }
     }
     """
@@ -134,17 +159,19 @@ def create_schema():
     bad_types = []
     for field_name, value in data["fields"].items():
         if isinstance(value, str):
-            data_type = value
-            option = None
-        elif isinstance(value, dict):
-            data_type = value["type"]
-            option = value["option"]
+            value = {"type": value}
 
+        if not isinstance(value, dict) or "type" not in value:
+            return jsonify(
+                error=f"field '{field_name}' must be an object with 'type'"
+            ), 400
+
+        data_type = value["type"]
         if data_type not in ALLOWED_TYPES:
             bad_types.append(data_type)
             continue
 
-        field_map[field_name] = {"type": data_type, "option": option}
+        field_map[field_name] = value
 
     if bad_types:
         return jsonify(
