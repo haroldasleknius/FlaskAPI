@@ -1,0 +1,17 @@
+name: Trigger Jenkins pipeline
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Start Jenkins build
+        uses: appleboy/jenkins-action@v1.1.1
+        with:
+          url:    ${{ secrets.JENKINS_HOST }}
+          user:   ${{ secrets.JENKINS_USER }}
+          token:  ${{ secrets.JENKINS_TOKEN }}
+          job:    HL_pipeline
