@@ -17,14 +17,14 @@ ALLOWED_TYPES = {
 
 
 def generate_integer(value):
-    min = int(value.get("min", 1))
-    max = int(value.get("max", 50000))
-    return random.randint(min, max)
+    low = int(value.get("min", 1))
+    high = int(value.get("max", 50000))
+    return random.randint(low, high)
 
 
 def generate_name(value):
-    format = value.get("format", "full")
-    match format:
+    name_format = value.get("format", "full")
+    match name_format:
         case "first":
             return faker.first_name()
         case "last":
@@ -61,7 +61,7 @@ def generate_ip(value):
 
 def generate_country(value):
     ### alpha2 = US, alpha3 = USA, name = United States
-    format = value.get("format", "alpha2")
+    country_format = value.get("format", "alpha2")
     countries = value.get("countries", None)
 
     if countries is not None:
@@ -72,7 +72,7 @@ def generate_country(value):
 
     country = iso3166.countries.get(option)
 
-    match format:
+    match country_format:
         case "alpha2":
             return option
         case "alpha3":
@@ -222,7 +222,7 @@ def generate_documents():  # pragma: no cover
     schema = SCHEMAS[schema_name]
 
     documents = []
-    for i in range(count):
+    for _ in range(count):
         documents.append(make_document(schema))
 
     return jsonify(documents), 200
