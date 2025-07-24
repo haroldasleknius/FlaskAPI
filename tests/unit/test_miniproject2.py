@@ -9,6 +9,8 @@ from miniproject2 import (
     generate_dob,
     generate_ip,
     generate_country,
+    make_document,
+    process_fields,
 )
 from datetime import datetime, date
 import ipaddress
@@ -143,8 +145,89 @@ def test_generate_country_invalid_format():
     assert str(error.value) == "unsupported country format"
 
 
-###not finished
-# def test_make_document_with_name():
-# schema = {"name": {"type": "name", "format": "full"}}
-# test_data = make_document(schema)
-# return test_data
+def test_make_document_with_valid_data_types():
+    schema = {
+        "id": {"type": "integer", "min": 1, "max": 3},
+        "name": {"type": "name", "format": "first"},
+        "dob": {"type": "dob", "min": 10, "max": 20},
+        "ip_pub": {"type": "ip", "version": 4, "visibility": "public"},
+        "country": {"type": "country", "format": "alpha2", "countries": ["US", "GB"]},
+    }
+
+    document = make_document(schema)
+
+    assert 1 <= document["id"] <= 3, "id is not between specified values"
+    assert isinstance(document["name"], str), "name is not a string"
+
+    dob = datetime.strptime(document["dob"], "%Y-%m-%d").date()
+    today = date.today()
+    age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+    assert 10 <= age <= 20, "age is not between 10 and 20"
+
+    try:
+        ip = ipaddress.IPv4Address(document["ip_pub"])
+    except ipaddress.AddressValueError:
+        pytest.fail("outputted data is not a valid ipv4 address")
+
+    assert not ip.is_private, "ip is not public"
+
+    country = document["country"]
+    assert isinstance(country, str)
+    assert len(country) == 2
+    assert country in {"US", "GB"}
+
+
+def test_make_documents_with_invalid_type():
+    schema = {
+        "wrong_type": {"type": "wrong_type"},
+    }
+    with pytest.raises(ValueError) as error:
+        make_document(schema)
+    assert str(error.value) == "Unsupported type: wrong_type"
+
+
+def test_process_fields_valid_types():
+    schema = {
+        "schema_name": "Haroldas's Generator",
+        "fields": {
+            "name": {"type": "name", "format": "full"},
+            "id": {"type": "integer", "min": 1, "max": 9999},
+            "dob": {"type": "dob", "min": 12, "max": 100},
+            "ip": {"type": "ip", "version": 4, "visibility": "public"},
+            "country_code": {
+                "type": "country",
+                "format": "alpha2",
+                "countries": ["US", "GB", "FR"],
+            },
+        },
+    }
+    field_map, bad_types = process_fields(schema)
+
+    expected_keys = set(schema["fields"].keys())
+    assert set(field_map.keys()) == expected_keys
+
+    for key, value in schema["fields"].items():
+        assert field_map[key] == value
+
+    assert bad_types == []
+
+
+def test_process_fields_with_string_data_type():
+    schema = {
+        "schema_name": "Haroldas's Generator",
+        "fields": {"name": "name", "ip": "ip"},
+    }
+    field_map, bad_types = process_fields(schema)
+    assert set(field_map.keys()) == {"name", "ip"}
+
+    assert field_map["name"] == {"type": "name"}
+    assert field_map["ip"] == {"type": "ip"}
+    assert bad_types == []
+
+
+def test_process_fields_invalid_type():
+    schema = {"fields": {"bad_type": {"type": "bad_type"}}}
+    field_map, bad_types = process_fields(schema)
+
+    assert "bad_type" not in field_map
+    assert "bad_type" in bad_types

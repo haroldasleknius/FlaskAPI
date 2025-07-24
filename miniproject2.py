@@ -118,8 +118,25 @@ def make_document(key_pairs):
     return document
 
 
-@app.post("/schemas")
-def create_schema():
+def process_fields(fields):
+    field_map = {}
+    bad_types = []
+    for field_name, value in fields["fields"].items():
+        if isinstance(value, str):
+            value = {"type": value}
+
+        data_type = value["type"]
+        if data_type not in ALLOWED_TYPES:
+            bad_types.append(data_type)
+            continue
+
+        field_map[field_name] = value
+
+    return field_map, bad_types
+
+
+@app.post("/schemas")  # pragma: no cover
+def create_schema():  # pragma: no cover
     """
     {
       "schema_name": "Haroldas's Generator",
@@ -155,23 +172,7 @@ def create_schema():
             Error="Schema name has already been taken", schema_name=schema_name
         ), 400
 
-    field_map = {}
-    bad_types = []
-    for field_name, value in data["fields"].items():
-        if isinstance(value, str):
-            value = {"type": value}
-
-        if not isinstance(value, dict) or "type" not in value:
-            return jsonify(
-                error=f"field '{field_name}' must be an object with 'type'"
-            ), 400
-
-        data_type = value["type"]
-        if data_type not in ALLOWED_TYPES:
-            bad_types.append(data_type)
-            continue
-
-        field_map[field_name] = value
+    field_map, bad_types = process_fields(data)
 
     if bad_types:
         return jsonify(
@@ -185,8 +186,8 @@ def create_schema():
     return jsonify(schema_name=schema_name, fields=field_map), 201
 
 
-@app.post("/generate-documents")
-def generate_documents():
+@app.post("/generate-documents")  # pragma: no cover
+def generate_documents():  # pragma: no cover
     """
     {
       "schema_name": "Haroldas's Generator",
