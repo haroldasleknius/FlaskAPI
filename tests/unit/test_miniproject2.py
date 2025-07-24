@@ -55,7 +55,7 @@ def test_generate_dob_age_range():
     dob = generate_dob({"min": 5, "max": 15})
     dob = datetime.strptime(dob, "%Y-%m-%d").date()
     today = date.today()
-    age = today.year - dob.year
+    age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
     assert 5 <= age <= 15
 
 
