@@ -1,5 +1,6 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response
 from faker import Faker
+import json
 import random
 import iso3166
 
@@ -135,6 +136,33 @@ def process_fields(fields):
     return field_map, bad_types
 
 
+def extract_schema_name_and_count(data):  # pragma: no cover
+    if not data or "schema_name" not in data:
+        return jsonify(Error="schema_name is required"), 400
+
+    if "count" not in data:
+        return jsonify(Error="Count is required"), 400
+
+    schema_name = data["schema_name"]
+    count = data["count"]
+
+    if not isinstance(schema_name, str) or not schema_name.strip():
+        return jsonify(Error="schema_name must be a non_empty string"), 400
+
+    if schema_name not in SCHEMAS:
+        return jsonify(Error="schema not found", schema_name=schema_name), 404
+
+    try:
+        count = int(count)
+    except (TypeError, ValueError):
+        return jsonify(Error="Count must be an integer that's greater than 0"), 400
+
+    if count < 1:
+        return jsonify(Error="Count must be greater than 0"), 400
+
+    return schema_name, count
+
+
 @app.post("/schemas")  # pragma: no cover
 def create_schema():  # pragma: no cover
     """
@@ -195,34 +223,26 @@ def generate_documents():  # pragma: no cover
     }
     """
     data = request.get_json()
+    result = extract_schema_name_and_count(data)
 
-    if not data or "schema_name" not in data:
-        return jsonify(Error="schema_name is required"), 400
+    if isinstance(result[0], Response):
+        return result
 
-    if "count" not in data:
-        return jsonify(Error="Count is required"), 400
-
-    schema_name = data["schema_name"]
-    count = data["count"]
-
-    if not schema_name:
-        return jsonify(Error="schema_name is missing"), 400
-
-    if schema_name not in SCHEMAS:
-        return jsonify(Error="schema not found", schema_name=schema_name), 404
-
-    try:
-        count = int(count)
-    except (TypeError, ValueError):
-        return jsonify(Error="Count must be an integer that's greater than 1"), 400
-
-    if count < 1:
-        return jsonify(Error="Count must be greater than 0"), 400
-
+    schema_name, count = result
     schema = SCHEMAS[schema_name]
 
-    documents = []
-    for _ in range(count):
-        documents.append(make_document(schema))
+    accept = request.headers.get("Accept", "application/json")
+
+    if accept == "application/x-ndjson":
+        lines = []
+        for _ in range(count):
+            lines.append(json.dumps(make_document(schema)))
+        return Response(
+            "\n".join(lines) + "\n", mimetype="application/x-ndjson", status=200
+        )
+    else:
+        documents = []
+        for _ in range(count):
+            documents.append(make_document(schema))
 
     return jsonify(documents), 200
