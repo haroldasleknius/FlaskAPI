@@ -201,7 +201,7 @@ def test_process_fields_valid_types():
             },
         },
     }
-    field_map, bad_types = process_fields(schema)
+    field_map, bad_types = process_fields(schema["fields"])
 
     expected_keys = set(schema["fields"].keys())
     assert set(field_map.keys()) == expected_keys
@@ -217,7 +217,7 @@ def test_process_fields_with_string_data_type():
         "schema_name": "Haroldas's Generator",
         "fields": {"name": "name", "ip": "ip"},
     }
-    field_map, bad_types = process_fields(schema)
+    field_map, bad_types = process_fields(schema["fields"])
     assert set(field_map.keys()) == {"name", "ip"}
 
     assert field_map["name"] == {"type": "name"}
@@ -227,7 +227,7 @@ def test_process_fields_with_string_data_type():
 
 def test_process_fields_invalid_type():
     schema = {"fields": {"bad_type": {"type": "bad_type"}}}
-    field_map, bad_types = process_fields(schema)
+    field_map, bad_types = process_fields(schema["fields"])
 
     assert "bad_type" not in field_map
     assert "bad_type" in bad_types
