@@ -122,7 +122,7 @@ def make_document(key_pairs):
 def process_fields(fields):
     field_map = {}
     bad_types = []
-    for field_name, value in fields["fields"].items():
+    for field_name, value in fields.items():
         if isinstance(value, str):
             value = {"type": value}
 
@@ -163,6 +163,38 @@ def extract_schema_name_and_count(data):  # pragma: no cover
     return schema_name, count
 
 
+def extract_schema_name_and_fields(data):  # pragma: no cover
+    if not data or "schema_name" not in data:
+        return jsonify(Error="schema_name is required"), 400
+
+    schema_name = data["schema_name"]
+
+    if not isinstance(schema_name, str) or not schema_name.strip():
+        return jsonify(Error="schema_name must be a non_empty string"), 400
+
+    if "fields" not in data:
+        return jsonify(Error="fields are required"), 400
+
+    fields = data["fields"]
+    if not isinstance(fields, dict) or not fields:
+        return jsonify(Error="fields must be a non-empty dict"), 400
+
+    if schema_name in SCHEMAS:
+        return jsonify(
+            Error="Schema name has already been taken", schema_name=schema_name
+        ), 400
+
+    field_map, bad_types = process_fields(fields)
+    if bad_types:
+        return jsonify(
+            Allowed_types=list(ALLOWED_TYPES),
+            Unknown_types=bad_types,
+            Error="unknown data types",
+        ), 400
+
+    return schema_name, field_map
+
+
 @app.post("/schemas")  # pragma: no cover
 def create_schema():  # pragma: no cover
     """
@@ -179,35 +211,12 @@ def create_schema():  # pragma: no cover
     """
     data = request.get_json()
 
-    if not data or "schema_name" not in data:
-        return jsonify(Error="schema_name is required"), 400
+    result = extract_schema_name_and_fields(data)
 
-    schema_name = data["schema_name"]
+    if isinstance(result[0], Response):
+        return result
 
-    if not isinstance(schema_name, str) or not schema_name.strip():
-        return jsonify(Error="schema_name must be a non_empty string"), 400
-
-    if "fields" not in data:
-        return jsonify(Error="fields are required"), 400
-
-    fields = data["fields"]
-
-    if not isinstance(fields, dict) or not fields:
-        return jsonify(Error="fields must be a non-empty dict"), 400
-
-    if schema_name in SCHEMAS:
-        return jsonify(
-            Error="Schema name has already been taken", schema_name=schema_name
-        ), 400
-
-    field_map, bad_types = process_fields(data)
-
-    if bad_types:
-        return jsonify(
-            Allowed_types=list(ALLOWED_TYPES),
-            Unknown_types=bad_types,
-            Error="unknown data types",
-        ), 400
+    schema_name, field_map = result
 
     SCHEMAS[schema_name] = field_map
 
