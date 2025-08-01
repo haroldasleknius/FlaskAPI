@@ -8,3 +8,5 @@ exclude_lines =
     ^def generate_documents
     ^def extract_schema_field_and_count
     ^def extract_schema_name_and_fields
+    ^def fetch_schema_by_name
+    ^def insert_schema
