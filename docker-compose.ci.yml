@@ -6,11 +6,17 @@ services:
       MYSQL_USER: haroldas
       MYSQL_PASSWORD: pass
       MYSQL_ROOT_PASSWORD: rootpass
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -prootpass --silent"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
   
   app:
     image: ${IMAGE_FULL}
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
       DB_HOST: db
       DB_PORT: 3306
@@ -20,3 +26,8 @@ services:
       USER: jenkins
       LOGNAME: jenkins
       HOME: /tmp
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sS http://localhost:5454/ >/dev/null || exit 1"]
+      interval: 2s
+      timeout: 2s
+      retries: 60
