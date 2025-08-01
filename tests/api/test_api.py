@@ -2,13 +2,15 @@ import pytest
 from playwright.sync_api import Playwright, APIRequestContext
 from typing import Generator
 import json
+import os
 
 
 @pytest.fixture(scope="session")
 def api_request_context(
     playwright: Playwright,
 ) -> Generator[APIRequestContext, None, None]:
-    request_context = playwright.request.new_context(base_url="http://127.0.0.1:5454")
+    base_url = os.getenv("BASE_URL", "http://127.0.0.1:5454")
+    request_context = playwright.request.new_context(base_url=base_url)
     yield request_context
     request_context.dispose()
 
