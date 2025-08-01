@@ -1,7 +1,6 @@
 services:
   db:
     image: mysql:8.4
-    container_name: mp2_mysql
     environment:
       MYSQL_DATABASE: miniproject2
       MYSQL_USER: haroldas
@@ -10,7 +9,6 @@ services:
   
   app:
     image: ${IMAGE_FULL}
-    container_name: mp2_app
     depends_on:
       - db
     environment:
