@@ -3,10 +3,14 @@ from faker import Faker
 import json
 import random
 import iso3166
+from db import DB
+import pymysql
 
 app = Flask(__name__)
 
-SCHEMAS = {}
+db = DB()
+db.init_schema()
+
 faker = Faker("en_GB")
 ALLOWED_TYPES = {
     "integer",
@@ -15,6 +19,25 @@ ALLOWED_TYPES = {
     "country",
     "ip",
 }
+
+
+def fetch_schema_by_name(schema_name):
+    row = db.query_one("SELECT `fields` FROM `schemas` WHERE name=%s", (schema_name,))
+    if row:
+        return json.loads(row["fields"])
+    else:
+        return None
+
+
+def insert_schema(schema_name, field_map):
+    try:
+        db.execute(
+            "INSERT INTO `schemas` (`name`, `fields`) VALUES (%s, %s)",
+            (schema_name, json.dumps(field_map)),
+        )
+        return True
+    except pymysql.err.IntegrityError:
+        return False
 
 
 def generate_integer(value):
@@ -136,7 +159,7 @@ def process_fields(fields):
     return field_map, bad_types
 
 
-def extract_schema_name_and_count(data):  # pragma: no cover
+def extract_schema_field_and_count(data):  # pragma: no cover
     if not data or "schema_name" not in data:
         return jsonify(Error="schema_name is required"), 400
 
@@ -149,7 +172,8 @@ def extract_schema_name_and_count(data):  # pragma: no cover
     if not isinstance(schema_name, str) or not schema_name.strip():
         return jsonify(Error="schema_name must be a non_empty string"), 400
 
-    if schema_name not in SCHEMAS:
+    schema_fields = fetch_schema_by_name(schema_name)
+    if not schema_fields:
         return jsonify(Error="schema not found", schema_name=schema_name), 404
 
     try:
@@ -160,7 +184,7 @@ def extract_schema_name_and_count(data):  # pragma: no cover
     if count < 1:
         return jsonify(Error="Count must be greater than 0"), 400
 
-    return schema_name, count
+    return schema_fields, count
 
 
 def extract_schema_name_and_fields(data):  # pragma: no cover
@@ -179,7 +203,7 @@ def extract_schema_name_and_fields(data):  # pragma: no cover
     if not isinstance(fields, dict) or not fields:
         return jsonify(Error="fields must be a non-empty dict"), 400
 
-    if schema_name in SCHEMAS:
+    if fetch_schema_by_name(schema_name):
         return jsonify(
             Error="Schema name has already been taken", schema_name=schema_name
         ), 400
@@ -218,7 +242,11 @@ def create_schema():  # pragma: no cover
 
     schema_name, field_map = result
 
-    SCHEMAS[schema_name] = field_map
+    schema = insert_schema(schema_name, field_map)
+    if not schema:
+        return jsonify(
+            Error="Schema name has already been taken", schema_name=schema_name
+        ), 400
 
     return jsonify(schema_name=schema_name, fields=field_map), 201
 
@@ -232,26 +260,25 @@ def generate_documents():  # pragma: no cover
     }
     """
     data = request.get_json()
-    result = extract_schema_name_and_count(data)
+    result = extract_schema_field_and_count(data)
 
     if isinstance(result[0], Response):
         return result
 
-    schema_name, count = result
-    schema = SCHEMAS[schema_name]
+    schema_fields, count = result
 
     accept = request.headers.get("Accept", "application/json")
 
     if accept == "application/x-ndjson":
         lines = []
         for _ in range(count):
-            lines.append(json.dumps(make_document(schema)))
+            lines.append(json.dumps(make_document(schema_fields)))
         return Response(
             "\n".join(lines) + "\n", mimetype="application/x-ndjson", status=200
         )
     else:
         documents = []
         for _ in range(count):
-            documents.append(make_document(schema))
+            documents.append(make_document(schema_fields))
 
     return jsonify(documents), 200

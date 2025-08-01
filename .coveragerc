@@ -6,5 +6,5 @@ exclude_lines =
     ^@app\.post
     ^def create_schema
     ^def generate_documents
-    ^def extract_schema_name_and_count
+    ^def extract_schema_field_and_count
     ^def extract_schema_name_and_fields
