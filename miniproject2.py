@@ -23,38 +23,6 @@ ALLOWED_TYPES = {
 
 PLACEMENTS = ["Winner", "Runner-up", "3rd-4th", "Top 8", "Top 16"]
 
-LOL_ORG_REGIONS = {
-    "Gen.G Esports": "KR",
-    "T1": "KR",
-    "Anyone's Legend": "CN",
-    "Hanwha Life Esports": "KR",
-    "BiliBili Gaming DREAMSMART": "CN",
-    "FlyQuest": "NA",
-    "Top Esports": "CN",
-    "CTBC Flying Oyster": "PCS",
-    "kt Rolster": "KR",
-    "Cloud9": "NA",
-    "PSG Talon": "PCS",
-    "DPlus KIA": "KR",
-    "G2 Esports": "EU",
-    "Invictus Gaming": "CN",
-    "Weibo Gaming": "CN",
-    "Beijing JDG Intel Esports": "CN",
-    "Karmine Corp": "EU",
-    "GAM Esports": "SEA",
-    "Team Liquid": "NA",
-    "Movistar KOI": "EU",
-    "Fnatic": "EU",
-    "Ninjas In Pyjamas": "EU",
-    "FunPlus Phoenix": "CN",
-    "100 Thieves": "NA",
-    "Team BDS": "EU",
-    "Team Vitality": "EU",
-    "Dignitas": "NA",
-    "Disguised": "NA",
-    "GIANTX": "EU",
-}
-
 GAMES = {
     "league_of_legends": {
         "roles": ["Top", "Jungle", "Mid", "ADC", "Support"],
