@@ -270,7 +270,17 @@ def make_document(key_pairs):
 
     document = {}
     game = None
+
     for field_name, value in key_pairs.items():
+        if value["type"] == "game":
+            document[field_name] == generate_game(value)
+            game = field_name
+            break
+
+    for field_name, value in key_pairs.items():
+        if field_name == game:
+            continue
+
         data_type = value["type"]
 
         match data_type:
@@ -285,9 +295,6 @@ def make_document(key_pairs):
             case "country":
                 document[field_name] = generate_country(value)
 
-            case "game":
-                document[field_name] = generate_game(value)
-                game = field_name
             case "role":
                 document[field_name] = generate_role(value, document, game)
             case "org":
