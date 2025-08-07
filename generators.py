@@ -273,7 +273,7 @@ def make_document(key_pairs):
 
     for field_name, value in key_pairs.items():
         if value["type"] == "game":
-            document[field_name] == generate_game(value)
+            document[field_name] = generate_game(value)
             game = field_name
             break
 
