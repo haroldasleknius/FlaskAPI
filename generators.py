@@ -174,9 +174,9 @@ def generate_trophies(value, document, name):
 
 
 def generate_gamer_tag():
-    word = coolname.generate_slug(1).capitalize()
+    word = coolname.generate()[0].capitalize()
     if random.random() < 0.5:
-        word += str(random.randint(1, 999))
+        word += str(random.randint(1, 10))
     return word
 
 
