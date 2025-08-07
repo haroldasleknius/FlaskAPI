@@ -3,7 +3,7 @@ import os
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 
-from miniproject2 import (
+from generators import (
     generate_integer,
     generate_name,
     generate_dob,
