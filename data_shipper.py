@@ -53,26 +53,29 @@ def create_schema():
         time_diff = (time.monotonic() - time_start) * 1000
         if r.status_code == 201:
             log.info(
-                "action=schema.create outcome=success status=%s duration_ms=%.1f",
+                "action=schema.create component=loader outcome=success status=%s duration_ms=%.1f",
                 r.status_code,
                 time_diff,
             )
         elif r.status_code == 400 and "already been taken" in r.text:
             log.info(
-                "action=schema.create outcome=already_exists status=%s duration_ms=%.1f",
+                "action=schema.create component=loader outcome=already_exists status=%s duration_ms=%.1f",
                 r.status_code,
                 time_diff,
             )
         else:
             log.warning(
-                "action=schema.create outcome=unexpected_response status=%s duration_ms=%.1f body_sample=%s",
+                "action=schema.create component=loader outcome=unexpected_response status=%s body_sample=%s duration_ms=%.1f",
                 r.status_code,
-                time_diff,
                 r.text[:200].replace("\n", " "),
+                time_diff,
             )
     except Exception:
         time_diff = (time.monotonic() - time_start) * 1000
-        log.exception("action=schema.create outcome=error duration_ms=%.1f", time_diff)
+        log.exception(
+            "action=schema.create component=loader outcome=error duration_ms=%.1f",
+            time_diff,
+        )
 
 
 def fetch_docs_raw():
@@ -81,20 +84,25 @@ def fetch_docs_raw():
     time_start = time.monotonic()
     try:
         log.debug(
-            "action=docs.fetch request=POST endpoint=%s count=%s", GEN_ENDPOINT, COUNT
+            "action=docs.fetch component=loader request=POST endpoint=%s count=%s",
+            GEN_ENDPOINT,
+            COUNT,
         )
         r = requests.post(GEN_ENDPOINT, json=payload, headers=headers, timeout=20)
         r.raise_for_status()
         time_diff = (time.monotonic() - time_start) * 1000
         log.info(
-            "action=docs.fetch outcome=success status=%s duration_ms=%.1f",
+            "action=docs.fetch component=loader outcome=success status=%s duration_ms=%.1f",
             r.status_code,
             time_diff,
         )
         return r.text
     except Exception:
         time_diff = (time.monotonic() - time_start) * 1000
-        log.exception("action=docs.fetch outcome=error duration_ms=%.1f", time_diff)
+        log.exception(
+            "action=docs.fetch component=loader outcome=error duration_ms=%.1f",
+            time_diff,
+        )
         raise
 
 
@@ -123,27 +131,43 @@ def bulk_upload():
         time_diff = (time.monotonic() - time_start) * 1000
         has_errors = bool(res.get("errors"))
 
-        log.info(
-            "action=bulk.upload outcome=%s errors=%s duration_ms=%.1f",
-            "success" if not has_errors else "error",
-            has_errors,
-            time_diff,
-        )
         if has_errors:
+            log.warning(
+                "action=bulk.upload component=loader outcome=partial_success index=%s errors=%s duration_ms=%.1f",
+                ES_INDEX,
+                True,
+                time_diff,
+            )
             log.error(
-                "action=bulk.upload error_sample=%s",
+                "action=bulk.upload component=loader error_sample=%s",
                 json.dumps(res.get("items", [])[:2])[:300],
+            )
+        else:
+            log.info(
+                "action=bulk.upload component=loader outcome=success index=%s errors=%s duration_ms=%.1f",
+                ES_INDEX,
+                False,
+                time_diff,
             )
     except Exception:
         time_diff = (time.monotonic() - time_start) * 1000
-        log.exception("action=bulk.upload outcome=error duration_ms=%.1f", time_diff)
+        log.exception(
+            "action=bulk.upload component=loader outcome=error index=%s duration_ms=%.1f",
+            ES_INDEX,
+            time_diff,
+        )
 
 
 def mapping_index():
     time_start = time.monotonic()
     try:
         if ES.indices.exists(index=ES_INDEX):
-            log.info("action=index.mapping outcome=exists index=%s", ES_INDEX)
+            time_diff = (time.monotonic() - time_start) * 1000
+            log.info(
+                "action=index.mapping component=loader outcome=exists index=%s duration_ms=%.1f",
+                ES_INDEX,
+                time_diff,
+            )
             return
 
         settings = {"number_of_shards": 1, "number_of_replicas": 0}
@@ -170,21 +194,25 @@ def mapping_index():
         ES.indices.create(index=ES_INDEX, settings=settings, mappings=mappings)
         time_diff = (time.monotonic() - time_start) * 1000
         log.info(
-            "action=index.mapping outcome=created index=%s duration_ms=%.1f",
+            "action=index.mapping component=loader outcome=created index=%s duration_ms=%.1f",
             ES_INDEX,
             time_diff,
         )
     except Exception:
         time_diff = (time.monotonic() - time_start) * 1000
         log.exception(
-            "action=index.mapping outcome=error index=%s duration_ms=%.1f",
+            "action=index.mapping component=loader outcome=error index=%s duration_ms=%.1f",
             ES_INDEX,
             time_diff,
         )
 
 
 def run_intervals():
-    log.info("action=runner.start interval_s=%s index=%s", INTERVAL, ES_INDEX)
+    log.info(
+        "action=runner.start component=loader outcome=started index=%s interval_s=%s",
+        ES_INDEX,
+        INTERVAL,
+    )
     while True:
         bulk_upload()
         time.sleep(INTERVAL)
