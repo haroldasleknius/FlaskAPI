@@ -17,7 +17,7 @@ db.init_schema()
 
 
 def fetch_schema_by_name(schema_name):  # pragma: no cover
-    row = db.query_one("SELECT fields FROM schemas WHERE name=%s", (schema_name,))
+    row = db.query_one("SELECT `fields` FROM `schemas` WHERE `name`=%s", (schema_name,))
     if row:
         return json.loads(row["fields"])
     else:
@@ -27,7 +27,7 @@ def fetch_schema_by_name(schema_name):  # pragma: no cover
 def insert_schema(schema_name, field_map):  # pragma: no cover
     try:
         db.execute(
-            "INSERT INTO schemas (name, fields) VALUES (%s, %s)",
+            "INSERT INTO `schemas` (`name`, `fields`) VALUES (%s, %s)",
             (schema_name, json.dumps(field_map)),
         )
         return True

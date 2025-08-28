@@ -59,10 +59,10 @@ class DB:
     def init_schema(self):
         time_start = time.monotonic()
         self.execute("""
-            CREATE TABLE IF NOT EXISTS schemas (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(255) NOT NULL UNIQUE,
-                fields JSON NOT NULL
+            CREATE TABLE IF NOT EXISTS `schemas` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
+            `name` VARCHAR(255) NOT NULL UNIQUE,
+            `fields` JSON NOT NULL
             );
         """)
         time_diff = (time.monotonic() - time_start) * 1000
