@@ -3,6 +3,12 @@ import json
 from db import DB
 import pymysql
 from generators import make_document, process_fields, ALLOWED_TYPES
+from logsetup import setup_logging, get_logger
+import time
+
+setup_logging()
+log = get_logger(__name__)
+
 
 app = Flask(__name__)
 
@@ -108,22 +114,46 @@ def create_schema():  # pragma: no cover
       }
     }
     """
-    data = request.get_json()
+    time_start = time.monotonic()
+    try:
+        data = request.get_json()
+        result = extract_schema_name_and_fields(data)
 
-    result = extract_schema_name_and_fields(data)
+        if isinstance(result[0], Response):
+            status = result[1] if len(result) > 1 else 400
+            time_diff = (time.monotonic() - time_start) * 1000
+            log.warning(
+                "action=schema.create outcome=validation_error status=%s duration_ms=%.1f",
+                status,
+                time_diff,
+            )
+            return result
 
-    if isinstance(result[0], Response):
-        return result
+        schema_name, field_map = result
+        created = insert_schema(schema_name, field_map)
 
-    schema_name, field_map = result
+        time_diff = (time.monotonic() - time_start) * 1000
+        if not created:
+            log.info(
+                "action=schema.create outcome=already_exists status=400 duration_ms=%.1f schema=%s",
+                time_diff,
+                schema_name,
+            )
+            return jsonify(
+                Error="Schema name has already been taken", schema_name=schema_name
+            ), 400
 
-    schema = insert_schema(schema_name, field_map)
-    if not schema:
-        return jsonify(
-            Error="Schema name has already been taken", schema_name=schema_name
-        ), 400
+        log.info(
+            "action=schema.create outcome=success status=201 duration_ms=%.1f schema=%s",
+            time_diff,
+            schema_name,
+        )
+        return jsonify(schema_name=schema_name, fields=field_map), 201
 
-    return jsonify(schema_name=schema_name, fields=field_map), 201
+    except Exception:
+        time_diff = (time.monotonic() - time_start) * 1000
+        log.exception("action=schema.create outcome=error duration_ms=%.1f", time_diff)
+        raise
 
 
 @app.post("/generate-documents")  # pragma: no cover
@@ -134,26 +164,50 @@ def generate_documents():  # pragma: no cover
       "count": 5
     }
     """
-    data = request.get_json()
-    result = extract_schema_field_and_count(data)
+    time_start = time.monotonic()
+    try:
+        data = request.get_json()
+        result = extract_schema_field_and_count(data)
 
-    if isinstance(result[0], Response):
-        return result
+        if isinstance(result[0], Response):
+            status = result[1] if len(result) > 1 else 400
+            time_diff = (time.monotonic() - time_start) * 1000
+            log.warning(
+                "action=docs.generate outcome=validation_error status=%s duration_ms=%.1f",
+                status,
+                time_diff,
+            )
+            return result
 
-    schema_fields, count = result
+        schema_fields, count = result
+        accept = request.headers.get("Accept", "application/json")
 
-    accept = request.headers.get("Accept", "application/json")
+        if accept == "application/x-ndjson":
+            lines = []
+            for _ in range(count):
+                lines.append(json.dumps(make_document(schema_fields)))
+            time_diff = (time.monotonic() - time_start) * 1000
+            log.info(
+                "action=docs.generate outcome=success status=200 duration_ms=%.1f count=%s mime=ndjson",
+                time_diff,
+                count,
+            )
+            return Response(
+                "\n".join(lines) + "\n", mimetype="application/x-ndjson", status=200
+            )
+        else:
+            documents = []
+            for _ in range(count):
+                documents.append(make_document(schema_fields))
+            time_diff = (time.monotonic() - time_start) * 1000
+            log.info(
+                "action=docs.generate outcome=success status=200 duration_ms=%.1f count=%s mime=json",
+                time_diff,
+                count,
+            )
+            return jsonify(documents), 200
 
-    if accept == "application/x-ndjson":
-        lines = []
-        for _ in range(count):
-            lines.append(json.dumps(make_document(schema_fields)))
-        return Response(
-            "\n".join(lines) + "\n", mimetype="application/x-ndjson", status=200
-        )
-    else:
-        documents = []
-        for _ in range(count):
-            documents.append(make_document(schema_fields))
-
-    return jsonify(documents), 200
+    except Exception:
+        time_diff = (time.monotonic() - time_start) * 1000
+        log.exception("action=docs.generate outcome=error duration_ms=%.1f", time_diff)
+        raise
