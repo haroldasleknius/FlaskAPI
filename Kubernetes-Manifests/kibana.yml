@@ -1,0 +1,39 @@
+apiVersion: kibana.k8s.elastic.co/v1
+kind: Kibana
+metadata:
+  name: kibana
+  namespace: elk
+spec:
+  version: 9.1.1
+  count: 1
+  elasticsearchRef:
+    name: elastic-search
+  podTemplate:
+    spec:
+      containers:
+      - name: kibana
+        env:
+          - name: NODE_OPTIONS
+            value: "--max-old-space-size=1024"
+        resources:
+          requests:
+            cpu: "300m"
+            memory: "1.2Gi"
+          limits:
+            cpu: "1"
+            memory: "1.6Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kibana-nodeport
+  namespace: elk
+spec:
+  type: NodePort
+  selector:
+    kibana.k8s.elastic.co/name: kibana
+  ports:
+    - name: https
+      port: 5601
+      targetPort: 5601
+      nodePort: 30103

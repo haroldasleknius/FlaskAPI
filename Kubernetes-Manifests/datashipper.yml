@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: data-shipper
+  namespace: shipper
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: data-shipper
+  template:
+    metadata:
+      labels:
+        app: data-shipper
+    spec:
+      containers:
+        - name: data-shipper
+          image: data-shipper:latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: data-shipper-config
+            - secretRef:
+                name: elastic-password
+          env:
+            - name: LOG_FORMAT
+              value: "json"
+            - name: LOG_LEVEL
+              value: "INFO"
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "128Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"

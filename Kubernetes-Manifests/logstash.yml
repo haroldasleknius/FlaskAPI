@@ -1,0 +1,118 @@
+apiVersion: logstash.k8s.elastic.co/v1alpha1
+kind: Logstash
+metadata:
+  name: logstash
+  namespace: elk
+spec:
+  version: 9.1.1
+  count: 1
+  elasticsearchRefs:
+    - name: elastic-search
+      namespace: elk
+      clusterName: esmain
+  pipelines:
+    - pipeline.id: main
+      config.string: |
+        input {
+          beats { port => 5044 }
+        }
+
+        filter {
+          if [kubernetes][namespace] == "elk" and [kubernetes][container][name] == "logstash" {
+            drop { }
+          }
+
+          if [message] =~ /^\s*[\{\[]/ {
+            json {
+              source => "message"
+              target => "[log][parsed]"
+              skip_on_invalid_json => true
+            }
+          }
+
+          if [message] =~ /(^|\s)(action|component|outcome|status|duration_ms|schema|count|mime|index|errors|interval_s|rows|found|host|port|request|endpoint)=/ {
+            kv {
+              source       => "message"
+              field_split  => " "
+              value_split  => "="
+              include_keys => ["action","component","outcome","status","duration_ms","schema","count","mime","index","errors","interval_s","rows","found","host","port","request","endpoint"]
+              target       => "msgkv"
+              trim_key     => " "
+              trim_value   => "\" "
+              timeout_millis => 100
+            }
+          }
+
+          mutate {
+            rename => {
+              "[msgkv][action]"      => "[event][action]"
+              "[msgkv][component]"   => "[labels][component]"
+              "[msgkv][outcome]"     => "[event][outcome]"
+              "[msgkv][status]"      => "[http][response][status_code]"
+              "[msgkv][duration_ms]" => "[metrics][duration_ms]"
+              "[msgkv][schema]"      => "[schema][name]"
+              "[msgkv][count]"       => "[metrics][count]"
+              "[msgkv][mime]"        => "[http][response][mime_type]"
+              "[msgkv][index]"       => "[elasticsearch][index]"
+              "[msgkv][errors]"      => "[elasticsearch][bulk][errors]"
+              "[msgkv][interval_s]"  => "[settings][interval_s]"
+              "[msgkv][rows]"        => "[db][rows]"
+              "[msgkv][found]"       => "[db][found]"
+              "[msgkv][host]"        => "[db][host]"
+              "[msgkv][port]"        => "[db][port]"
+              "[msgkv][request]"     => "[http][request][method]"
+              "[msgkv][endpoint]"    => "[url][original]"
+            }
+          }
+
+          mutate {
+            lowercase => ["[db][found]"]
+            convert => {
+              "[http][response][status_code]" => "integer"
+              "[metrics][duration_ms]"        => "float"
+              "[metrics][count]"              => "integer"
+              "[db][rows]"                    => "integer"
+              "[db][port]"                    => "integer"
+              "[settings][interval_s]"        => "integer"
+              "[elasticsearch][bulk][errors]" => "boolean"
+              "[db][found]"                   => "boolean"
+            }
+            remove_field => ["msgkv","[log][parsed]"]
+          }
+        }
+
+        output {
+          elasticsearch {
+            hosts => ["${ESMAIN_ES_HOSTS}"]
+            ssl_certificate_authorities => "${ESMAIN_ES_SSL_CERTIFICATE_AUTHORITY}"
+            api_key => "${ES_API_KEY}"
+            index => "k8s-logs-%{+YYYY.MM.dd}"
+            manage_template => false
+            ilm_enabled => false
+          }
+        }
+  services:
+    - name: beats
+      service:
+        spec:
+          ports:
+            - name: beats
+              port: 5044
+              targetPort: 5044
+              protocol: TCP
+  podTemplate:
+    spec:
+      containers:
+        - name: logstash
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "1Gi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          env:
+            - name: LS_JAVA_OPTS
+              value: "-Xms512m -Xmx512m"
+            - name: ES_API_KEY
+              value: "gGeJ85gByUfXcwWJNRsl:SwkUoE6zn0_uwXbT3qq04g"

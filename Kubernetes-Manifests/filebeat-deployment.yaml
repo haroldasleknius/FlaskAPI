@@ -1,0 +1,117 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: filebeat
+  namespace: log-system
+  labels:
+    app: filebeat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: filebeat
+  template:
+    metadata:
+      labels:
+        app: filebeat
+    spec:
+      serviceAccountName: filebeat
+      tolerations:
+        - key: "node-role.kubernetes.io/control-plane"
+          operator: "Exists"
+          effect: "NoSchedule"
+        - key: "node-role.kubernetes.io/master"
+          operator: "Exists"
+          effect: "NoSchedule"
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: filebeat
+          image: docker.elastic.co/beats/filebeat:9.1.1
+          args: ["-c","/usr/share/filebeat/filebeat.yml","-e"]
+          env:
+            - name: ES_URL
+              value: "https://elastic-search-es-http.elk.svc:9200"
+            - name: ES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: log-secret
+                  key: ES_USER
+            - name: ES_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: log-secret
+                  key: ES_PASS
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - name: varlogs
+              mountPath: /var/log/containers
+              readOnly: true
+            - name: varpods
+              mountPath: /var/log/pods
+              readOnly: true
+            - name: dockerlogs
+              mountPath: /var/lib/docker/containers
+              readOnly: true
+            - name: containerd
+              mountPath: /var/lib/containerd
+              readOnly: true
+            - name: filebeat-config
+              mountPath: /usr/share/filebeat/filebeat.yml
+              subPath: filebeat.yml
+              readOnly: true
+            - name: filebeat-data
+              mountPath: /usr/share/filebeat/data
+      volumes:
+        - name: varlogs
+          hostPath:
+            path: /var/log/containers
+        - name: varpods
+          hostPath:
+            path: /var/log/pods
+        - name: dockerlogs
+          hostPath:
+            path: /var/lib/docker/containers
+        - name: containerd
+          hostPath:
+            path: /var/lib/containerd
+        - name: filebeat-config
+          configMap:
+            name: filebeat-config
+        - name: filebeat-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: filebeat
+  namespace: log-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: filebeat
+rules:
+  - apiGroups: [""]
+    resources: ["nodes","namespaces","pods","services"]
+    verbs: ["get","list","watch"]
+  - apiGroups: ["apps"]
+    resources: ["replicasets","deployments"]
+    verbs: ["get","list","watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: filebeat
+subjects:
+  - kind: ServiceAccount
+    name: filebeat
+    namespace: log-system
+roleRef:
+  kind: ClusterRole
+  name: filebeat
+  apiGroup: rbac.authorization.k8s.io
